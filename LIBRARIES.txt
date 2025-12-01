@@ -1,0 +1,144 @@
+================================================================================
+REQUIRED LIBRARIES FOR REGENERATIVE BRAKING SYSTEM
+================================================================================
+
+This file lists all libraries needed to compile the regenerative braking code.
+
+================================================================================
+ARDUINO IDE INSTALLATION
+================================================================================
+
+1. ESP32 Board Support (Required)
+   ────────────────────────────────────────────────────────────────────────
+   Installation:
+     1. File → Preferences
+     2. Add to "Additional Board Manager URLs":
+        https://raw.githubusercontent.com/espressif/arduino-esp32/gh-pages/package_esp32_index.json
+     3. Tools → Board → Boards Manager
+     4. Search: "esp32"
+     5. Install: "esp32" by Espressif Systems
+
+   Version: 2.0.0 or higher
+   License: LGPL 2.1
+
+2. WebSockets Library (Required)
+   ────────────────────────────────────────────────────────────────────────
+   Installation:
+     1. Sketch → Include Library → Manage Libraries
+     2. Search: "WebSockets"
+     3. Install: "WebSockets" by Markus Sattler
+
+   Version: 2.3.6 or higher
+   GitHub: https://github.com/Links2004/arduinoWebSockets
+   License: LGPL 2.1
+
+3. Built-in Libraries (Included with ESP32 Core)
+   ────────────────────────────────────────────────────────────────────────
+   The following libraries come pre-installed with ESP32 board support:
+
+   - WiFi.h              (WiFi functionality)
+   - WebServer.h         (HTTP server)
+   - FreeRTOS            (Real-time OS, mutexes)
+   - Wire.h              (I2C, not used in this project)
+
+   No additional installation needed for these.
+
+================================================================================
+PLATFORMIO INSTALLATION
+================================================================================
+
+All dependencies are automatically managed by PlatformIO.
+
+The platformio.ini file already includes:
+
+[env:esp32dev]
+platform = espressif32
+framework = arduino
+lib_deps =
+    links2004/WebSockets@^2.4.1
+
+Just run:
+  pio run
+
+================================================================================
+LIBRARY USAGE IN PROJECT
+================================================================================
+
+CurrentSensor.h / .cpp
+  ├── Arduino.h                    (Core Arduino functions)
+  ├── freertos/FreeRTOS.h          (FreeRTOS core)
+  └── freertos/semphr.h            (Mutex support)
+
+VoltageSensor.h / .cpp
+  ├── Arduino.h                    (Core Arduino functions)
+  ├── freertos/FreeRTOS.h          (FreeRTOS core)
+  └── freertos/semphr.h            (Mutex support)
+
+MotorControl.h / .cpp
+  ├── Arduino.h                    (Core Arduino functions)
+  ├── freertos/FreeRTOS.h          (FreeRTOS core)
+  ├── freertos/semphr.h            (Mutex support)
+  └── CurrentSensor.h              (Local project file)
+
+WebServerControl.h / .cpp
+  ├── Arduino.h                    (Core Arduino functions)
+  ├── WiFi.h                       (WiFi AP mode)
+  ├── WebServer.h                  (HTTP server)
+  ├── WebSocketsServer.h           (WebSocket server - EXTERNAL)
+  ├── freertos/FreeRTOS.h          (FreeRTOS core)
+  ├── freertos/semphr.h            (Mutex support)
+  ├── CurrentSensor.h              (Local project file)
+  ├── VoltageSensor.h              (Local project file)
+  └── MotorControl.h               (Local project file)
+
+regen_braking.ino
+  ├── CurrentSensor.h              (Local project file)
+  ├── VoltageSensor.h              (Local project file)
+  ├── MotorControl.h               (Local project file)
+  └── WebServerControl.h           (Local project file)
+
+================================================================================
+TROUBLESHOOTING LIBRARY ISSUES
+================================================================================
+
+Problem: "WebSocketsServer.h: No such file or directory"
+Solution: Install WebSockets library by Markus Sattler
+          (Sketch → Include Library → Manage Libraries → search "WebSockets")
+
+Problem: "WiFi.h: No such file or directory"
+Solution: Install ESP32 board support via Board Manager
+
+Problem: Compilation errors with FreeRTOS
+Solution: Update ESP32 core to version 2.0.0 or higher
+
+Problem: "webServer" errors or undefined references
+Solution: Make sure you selected ESP32 board (Tools → Board → ESP32 Dev Module)
+
+================================================================================
+VERIFICATION
+================================================================================
+
+To verify all libraries are installed correctly:
+
+1. Open regen_braking.ino in Arduino IDE
+2. Click "Verify" (checkmark button)
+3. Should compile without errors
+
+Expected output:
+  "Done compiling"
+  "Sketch uses XXXXX bytes (XX%) of program storage space"
+
+If you see errors, check the error message and install missing libraries.
+
+================================================================================
+EXTERNAL DEPENDENCIES
+================================================================================
+
+Only ONE external library is required:
+
+  WebSockets by Markus Sattler
+  └── Provides WebSocket server for real-time updates (100ms interval)
+
+Everything else is built-in with ESP32 Arduino core.
+
+================================================================================

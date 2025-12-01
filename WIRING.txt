@@ -1,0 +1,222 @@
+================================================================================
+REGENERATIVE BRAKING SYSTEM - WIRING QUICK REFERENCE
+================================================================================
+
+ESP32 PIN CONNECTIONS
+================================================================================
+
+GPIO23  ──>  ACS758LCB-50 Output (Current Sensor)
+GPIO34  ──>  Voltage Divider Output (10kΩ + 3.3kΩ)
+GPIO15  ──>  Level Shifter Input (3.3V side)
+GPIO19  ──>  BTS7960 RPWM (Forward PWM)
+GPIO18  ──>  BTS7960 LPWM (Keep LOW)
+3.3V    ──>  ACS758 VCC, Level Shifter VCC-Low
+5V      ──>  BTS7960 VCC, Level Shifter VCC-High
+GND     ──>  Common Ground (all components)
+
+
+CURRENT SENSOR (ACS758LCB-50)
+================================================================================
+
+ACS758 Pin          Connection
+────────────────────────────────────────────────────────────────
+VCC (3.3V)          ESP32 3.3V
+GND                 ESP32 GND
+OUT                 ESP32 GPIO23
+IP+ (High Current)  Battery Positive (+)
+IP- (High Current)  Motor/Buck-Boost
+
+
+VOLTAGE DIVIDER (Battery Voltage Sensing)
+================================================================================
+
+Component           Connection
+────────────────────────────────────────────────────────────────
+R1 (10kΩ)           Battery(+) to Junction
+R2 (3.3kΩ)          Junction to GND
+Junction            ESP32 GPIO34
+
+Note: Max input = 13.3V (for 3.3V ADC max)
+
+
+RELAY MODULE (5V)
+================================================================================
+
+Relay Pin           Connection
+────────────────────────────────────────────────────────────────
+VCC                 Level Shifter Output (5V side)
+GND                 Common GND
+IN                  Level Shifter Output
+COM                 Motor Terminal 1
+NO (Norm. Open)     BTS7960 M+ Output
+NC (Norm. Closed)   Buck-Boost Input (+)
+
+
+LEVEL SHIFTER (3.3V to 5V)
+================================================================================
+
+Low Side (3.3V)     High Side (5V)
+────────────────────────────────────────────────────────────────
+LV                  HV
+GND                 GND
+TX (or Channel 1)   RX (or Channel 1)
+ESP32 GPIO15 ──>    TX          RX ──> Relay IN
+ESP32 3.3V   ──>    LV          HV <── 5V Supply
+
+
+BTS7960 MOTOR DRIVER
+================================================================================
+
+BTS7960 Pin         Connection
+────────────────────────────────────────────────────────────────
+RPWM                ESP32 GPIO19
+LPWM                ESP32 GPIO18
+R_EN                5V (Hardware tied HIGH)
+L_EN                5V (Hardware tied HIGH)
+VCC                 5V (Logic supply)
+GND                 Common GND
+B+                  12V Power Supply (+)
+B-                  12V Power Supply (-)
+M+                  Relay NO (Normally Open)
+M-                  Motor Terminal 2
+
+
+MOTOR CONNECTIONS
+================================================================================
+
+Motor Terminal      Connection
+────────────────────────────────────────────────────────────────
+Terminal 1          Relay COM
+Terminal 2          BTS7960 M-
+                    AND Buck-Boost Input (-)
+
+Note: Relay switches Terminal 1 between:
+  - NO (Motor mode):    Connected to BTS7960 M+
+  - NC (Charge mode):   Connected to Buck-Boost (+)
+
+
+BUCK-BOOST CONVERTER
+================================================================================
+
+Converter Pin       Connection
+────────────────────────────────────────────────────────────────
+IN+                 Relay NC (Normally Closed)
+IN-                 Motor Terminal 2 (shared with BTS7960 M-)
+OUT+                Battery (+)
+OUT-                Battery (-)
+
+Note: Configure buck-boost for proper charging voltage/current
+
+
+BATTERY (12V Lead-Acid)
+================================================================================
+
+Battery Terminal    Connection
+────────────────────────────────────────────────────────────────
+Positive (+)        ACS758 IP+
+                    Voltage Divider R1
+                    Buck-Boost OUT+
+Negative (-)        Common GND
+                    Buck-Boost OUT-
+
+
+POWER SUPPLY (12V for BTS7960)
+================================================================================
+
+Supply Terminal     Connection
+────────────────────────────────────────────────────────────────
+Positive (+)        BTS7960 B+
+Negative (-)        BTS7960 B- (and common GND)
+
+
+SYSTEM OPERATION MODES
+================================================================================
+
+MOTOR MODE (Relay ON, GPIO15=HIGH):
+────────────────────────────────────────────────────────────────
+  Battery(+) ──> ACS758 ──> Motor ──> Relay COM ──> NO ──> BTS7960 M+
+  Motor Terminal 2 ──> BTS7960 M-
+  PWM Active: RPWM=255, LPWM=0
+  Result: Motor spins forward at full speed
+
+CHARGING MODE (Relay OFF, GPIO15=LOW):
+────────────────────────────────────────────────────────────────
+  Motor acts as generator
+  Motor Terminal 1 ──> Relay COM ──> NC ──> Buck-Boost IN+
+  Motor Terminal 2 ──> Buck-Boost IN-
+  Buck-Boost OUT ──> Battery
+  PWM Inactive: RPWM=0, LPWM=0
+  Result: Motor generates power, charges battery
+
+
+IMPORTANT NOTES
+================================================================================
+
+1. GROUND CONNECTIONS
+   All grounds must be connected together:
+   - ESP32 GND
+   - ACS758 GND
+   - BTS7960 GND
+   - Relay GND
+   - Buck-Boost GND
+   - Battery (-)
+   - 12V Power Supply (-)
+
+2. POWER SUPPLY
+   - ESP32: USB or 5V regulator
+   - ACS758: 3.3V from ESP32 (NOT 5V!)
+   - BTS7960 Logic: 5V
+   - BTS7960 Motor: 12V from separate supply
+   - Relay: 5V via level shifter
+
+3. CURRENT FLOW
+   High current path (use thick wires):
+   Battery → ACS758 → Motor → Relay/Buck-Boost
+
+4. SAFETY
+   - Use appropriate wire gauge for motor current
+   - Add fuse between battery and ACS758 (50A recommended)
+   - Ensure BTS7960 has adequate heatsinking
+   - Verify all connections before powering on
+
+5. TESTING
+   - Test voltage divider with multimeter first
+   - Verify ACS758 output is ~1.65V at zero current
+   - Check relay clicks when GPIO15 toggles
+   - Test motor operation at low voltage first
+
+
+TROUBLESHOOTING CHECKLIST
+================================================================================
+
+☐ Common ground connected to all components
+☐ ACS758 powered by 3.3V (not 5V)
+☐ Voltage divider gives ~3.3V at 13.3V battery input
+☐ Level shifter properly powered (3.3V and 5V sides)
+☐ BTS7960 enable pins tied to 5V
+☐ Relay clicks when GPIO15 toggles (use test code)
+☐ Motor connections secure and correct polarity
+☐ Buck-boost configured for 12V charging
+☐ All high-current wires thick enough (14-16 AWG minimum)
+☐ Fuse installed in battery positive line
+
+
+WIRE GAUGE RECOMMENDATIONS
+================================================================================
+
+Current Rating      Minimum Wire Gauge (AWG)
+────────────────────────────────────────────────────────────────
+< 5A                22 AWG
+5A - 10A            18 AWG
+10A - 20A           16 AWG
+20A - 40A           14 AWG
+> 40A               12 AWG or thicker
+
+For this project (40A max):
+- Battery to ACS758:       14 AWG
+- ACS758 to Motor/Relay:   14 AWG
+- Motor to BTS7960:        14 AWG
+- Signal wires:            22-26 AWG
+
+
+================================================================================
