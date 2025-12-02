@@ -46,6 +46,9 @@ private:
     unsigned long m_motorStartTime;
     bool m_timerActive;
 
+    // Speed control
+    uint8_t m_currentSpeed;
+
     // Current sensor reference for overcurrent protection
     CurrentSensor* m_currentSensor;
 
@@ -129,4 +132,17 @@ public:
      * @return true if charging
      */
     bool isCharging() const { return m_state == State::CHARGING; }
+
+    /**
+     * @brief Set motor speed (0-255)
+     * @param speed PWM value (0=stopped, 255=full speed)
+     * @return true if successful (only works when motor is running)
+     */
+    bool setSpeed(uint8_t speed);
+
+    /**
+     * @brief Get current motor speed
+     * @return Current PWM speed (0-255)
+     */
+    uint8_t getSpeed() const { return m_currentSpeed; }
 };

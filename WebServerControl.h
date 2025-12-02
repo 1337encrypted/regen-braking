@@ -47,6 +47,7 @@ private:
     void handleRoot();
     void handleStart();
     void handleStop();
+    void handleSpeed();
     void handleStatus();
     void handleNotFound();
 

@@ -13,6 +13,7 @@ MotorControl::MotorControl(
     , m_mutex(NULL)
     , m_motorStartTime(0)
     , m_timerActive(false)
+    , m_currentSpeed(128)  // Default to 50% speed
     , m_currentSensor(currentSensor)
 {
 }
@@ -87,14 +88,14 @@ bool MotorControl::startMotor() {
         // Sequence: Relay ON first, then PWM
         setRelay(true);       // Switch to motor mode
         delay(50);            // Small delay for relay to settle
-        setPWM(PWM_FULL_SPEED);  // Full speed
+        setPWM(m_currentSpeed);  // Use current speed setting
 
         // Start safety timer
         m_motorStartTime = millis();
         m_timerActive = true;
         m_state = State::RUNNING;
 
-        Serial.printf("Motor started at full speed (PWM=%d)\n", PWM_FULL_SPEED);
+        Serial.printf("Motor started at speed %d (%.0f%%)\n", m_currentSpeed, (m_currentSpeed / 255.0f) * 100.0f);
         Serial.printf("Auto-stop in %lu seconds\n", MOTOR_TIMEOUT_MS / 1000);
         Serial.println("======================\n");
 
@@ -204,4 +205,21 @@ unsigned long MotorControl::getTimeRemaining() const {
     }
 
     return (MOTOR_TIMEOUT_MS - elapsed) / 1000;  // Return seconds
+}
+
+bool MotorControl::setSpeed(uint8_t speed) {
+    if (xSemaphoreTake(m_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        m_currentSpeed = speed;
+
+        // If motor is running, update PWM immediately
+        if (m_state == State::RUNNING) {
+            setPWM(m_currentSpeed);
+            Serial.printf("Speed changed to %d (%.0f%%)\n", m_currentSpeed, (m_currentSpeed / 255.0f) * 100.0f);
+        }
+
+        xSemaphoreGive(m_mutex);
+        return true;
+    }
+
+    return false;
 }

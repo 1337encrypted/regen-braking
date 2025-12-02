@@ -64,6 +64,47 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
             gap: 15px;
             margin-bottom: 20px;
         }
+        .speed-control {
+            background-color: #1a1a1a;
+            border: 1px solid #fff;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .speed-label {
+            font-size: 14px;
+            color: #aaa;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+        }
+        .speed-value {
+            color: #fff;
+            font-weight: bold;
+        }
+        .slider {
+            width: 100%;
+            height: 8px;
+            background: #333;
+            outline: none;
+            border: 1px solid #fff;
+            -webkit-appearance: none;
+        }
+        .slider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            cursor: pointer;
+            border: 2px solid #000;
+        }
+        .slider::-moz-range-thumb {
+            width: 20px;
+            height: 20px;
+            background: #fff;
+            cursor: pointer;
+            border: 2px solid #000;
+        }
         button {
             padding: 20px;
             font-size: 18px;
@@ -163,6 +204,14 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
             </div>
         </div>
 
+        <div class="speed-control">
+            <div class="speed-label">
+                <span>MOTOR SPEED</span>
+                <span class="speed-value"><span id="speedValue">128</span> (<span id="speedPercent">50</span>%)</span>
+            </div>
+            <input type="range" min="0" max="255" value="128" class="slider" id="speedSlider" oninput="updateSpeedDisplay(this.value)" onchange="setSpeed(this.value)">
+        </div>
+
         <div class="controls">
             <button id="btnStart" onclick="startMotor()">START MOTOR</button>
             <button id="btnStop" onclick="stopMotor()">CHARGE</button>
@@ -204,6 +253,13 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
                     // Update displays
                     document.getElementById('current').textContent = Math.round(data.current);
                     document.getElementById('voltage').textContent = data.voltage.toFixed(2);
+
+                    // Update speed slider (only if not currently being dragged)
+                    if (data.speed !== undefined && !document.getElementById('speedSlider').matches(':active')) {
+                        document.getElementById('speedSlider').value = data.speed;
+                        document.getElementById('speedValue').textContent = data.speed;
+                        document.getElementById('speedPercent').textContent = Math.round((data.speed / 255) * 100);
+                    }
 
                     // Update state
                     const stateEl = document.getElementById('state');
@@ -253,6 +309,18 @@ static const char INDEX_HTML[] PROGMEM = R"rawliteral(
             fetch('/api/stop')
                 .then(response => response.text())
                 .then(data => console.log('Stop:', data))
+                .catch(error => console.error('Error:', error));
+        }
+
+        function updateSpeedDisplay(value) {
+            document.getElementById('speedValue').textContent = value;
+            document.getElementById('speedPercent').textContent = Math.round((value / 255) * 100);
+        }
+
+        function setSpeed(value) {
+            fetch('/api/speed?value=' + value)
+                .then(response => response.text())
+                .then(data => console.log('Speed set:', data))
                 .catch(error => console.error('Error:', error));
         }
 
@@ -364,6 +432,7 @@ void WebServerControl::setupRoutes() {
     // API endpoints
     m_server->on("/api/start", HTTP_GET, [this]() { handleStart(); });
     m_server->on("/api/stop", HTTP_GET, [this]() { handleStop(); });
+    m_server->on("/api/speed", HTTP_GET, [this]() { handleSpeed(); });
     m_server->on("/api/status", HTTP_GET, [this]() { handleStatus(); });
 
     // Not found handler
@@ -404,6 +473,33 @@ void WebServerControl::handleStop() {
     }
 }
 
+void WebServerControl::handleSpeed() {
+    if (!m_server->hasArg("value")) {
+        m_server->send(400, "text/plain", "Missing speed value");
+        return;
+    }
+
+    int speed = m_server->arg("value").toInt();
+
+    if (speed < 0 || speed > 255) {
+        m_server->send(400, "text/plain", "Speed must be 0-255");
+        return;
+    }
+
+    if (xSemaphoreTake(m_mutex, pdMS_TO_TICKS(100)) == pdTRUE) {
+        bool success = m_motorControl->setSpeed((uint8_t)speed);
+        xSemaphoreGive(m_mutex);
+
+        if (success) {
+            m_server->send(200, "text/plain", "Speed set to " + String(speed));
+        } else {
+            m_server->send(500, "text/plain", "Failed to set speed");
+        }
+    } else {
+        m_server->send(500, "text/plain", "Mutex timeout");
+    }
+}
+
 void WebServerControl::handleStatus() {
     String json = "{";
 
@@ -412,11 +508,13 @@ void WebServerControl::handleStatus() {
         float voltage = m_voltageSensor->readVoltage(false);
         String state = m_motorControl->getStateString();
         unsigned long timeLeft = m_motorControl->getTimeRemaining();
+        uint8_t speed = m_motorControl->getSpeed();
 
         json += "\"current\":" + String(current, 0);
         json += ",\"voltage\":" + String(voltage, 2);
         json += ",\"state\":\"" + state + "\"";
         json += ",\"timeLeft\":" + String(timeLeft);
+        json += ",\"speed\":" + String(speed);
 
         xSemaphoreGive(m_mutex);
     }
